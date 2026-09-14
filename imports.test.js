@@ -33,3 +33,10 @@ test('ICS rejects impossible dates and times while retaining valid leap-day even
  assert.equal(result.events[0].dueDate,'2028-02-29');
  assert.deepEqual(result.warnings,['5 entries had missing or unsupported dates.']);
 });
+
+test('matrix imports day plus one time-range column',()=>{
+ const detected=detectMatrix(parseCSV('Day,Time,Event\nMonday,0700-0730,Formation\nTuesday,0900–1030,Lab'));
+ assert.equal(detected.singleTime,true);
+ const events=parseMatrix(detected,{day:0,time:1,title:2},null);
+ assert.deepEqual(events.map(x=>[x.day,x.start,x.end,x.title]),[[0,420,450,'Formation'],[1,540,630,'Lab']]);
+});

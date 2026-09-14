@@ -15,12 +15,12 @@ export function parseCSV(text){
 const dayAliases=[['mo','mon','monday','m'],['tu','tue','tues','tuesday','t'],['we','wed','wednesday','w'],['th','thu','thur','thurs','thursday','r'],['fr','fri','friday','f'],['sa','sat','saturday'],['su','sun','sunday']];
 export const dayIndex=value=>dayAliases.findIndex(a=>a.includes(String(value??'').trim().toLowerCase()));
 export function detectMatrix(rows){
- const header=rows.findIndex(r=>r.filter(v=>dayIndex(v)>=0).length>=3||r.some(v=>/^(day|start|activity|time)$/i.test(v)));
+ const header=rows.findIndex(r=>r.filter(v=>dayIndex(v)>=0).length>=3||r.some(v=>/^(day|start|end|activity|event|time|period)$/i.test(v)));
  if(header<0)throw Error('No schedule header was found. Include Day, Start, End, Activity or a Time column with weekdays.');
- const headers=rows[header],wide=headers.filter(h=>dayIndex(h)>=0).length>=3;return {headers,rows:rows.slice(header+1),wide};
+ const headers=rows[header],wide=headers.filter(h=>dayIndex(h)>=0).length>=3,singleTime=!wide&&headers.some(h=>/^(time|period|range)$/i.test(h))&&!headers.some(h=>/^(end|end_time|finish|to)$/i.test(h));return {headers,rows:rows.slice(header+1),wide,singleTime};
 }
 export function parseMatrix(detected,mapping,week){
- const out=[],seen=new Set(),{headers,rows,wide}=detected;
+ const out=[],seen=new Set(),{headers,rows,wide,singleTime}=detected;
  const add=(day,start,end,raw,location='',uniform='')=>{
   const text=String(raw||'').trim();if(!text||/^(—|-|n\/a)$/i.test(text))return;if(day<0)throw Error('A row has an unknown weekday.');
   if(start>=1440||start===end)throw Error('A commitment must have a non-zero duration and start before midnight.');
@@ -30,6 +30,7 @@ export function parseMatrix(detected,mapping,week){
  };
  const loc=headers.findIndex(h=>/location/i.test(h)),uniform=headers.findIndex(h=>/uniform/i.test(h));
  if(wide){const timeCol=headers.findIndex(h=>/time|period/i.test(h));for(const row of rows){if(!row.some(Boolean))continue;const range=String(row[timeCol<0?0:timeCol]).split(/\s*[-–—]\s*/);if(range.length!==2)throw Error('Each time cell needs a range, such as 0700–0730.');headers.forEach((h,i)=>{const d=dayIndex(h);if(d>=0)add(d,parseTime(range[0]),parseTime(range[1]),row[i]);});}}
+ else if(singleTime){if(new Set(Object.values(mapping)).size<3)throw Error('Choose a different column for each field.');for(const row of rows){if(!row[mapping.title]||/^(—|-|n\/a)$/i.test(row[mapping.title]))continue;const range=String(row[mapping.time]||'').split(/\s*[-–—]\s*/);if(range.length!==2)throw Error('Each time cell needs a range, such as 0700–0730.');add(dayIndex(row[mapping.day]),parseTime(range[0]),parseTime(range[1]),row[mapping.title],row[loc]||'',row[uniform]||'');}}
  else {if(new Set(Object.values(mapping)).size<4)throw Error('Choose a different column for each field.');for(const row of rows){if(!row[mapping.title]||/^(—|-|n\/a)$/i.test(row[mapping.title]))continue;add(dayIndex(row[mapping.day]),parseTime(row[mapping.start]),parseTime(row[mapping.end]),row[mapping.title],row[loc]||'',row[uniform]||'');}}
  return out;
 }
